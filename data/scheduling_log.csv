@@ -1,0 +1,20 @@
+timestamp,stage,policy,avg_waiting,avg_turnaround,avg_response,context_switches,makespan
+2026-10-11T10:54:32,Boot / Launch,SJF,5.6,10.0,5.6,4,22
+2026-10-11T10:56:35,Boot / Launch,SJF,5.6,10.0,5.6,4,22
+2026-10-11T10:56:36,Boot / Launch,SJF,5.6,10.0,5.6,4,22
+2026-10-26T18:32:26,Active Gameplay,PRIORITY,9.4,13.8,9.4,4,22
+2026-10-26T18:32:32,Boot / Launch,SJF,5.6,10.0,5.6,4,22
+2026-10-26T18:33:06,Matchmaking / Queue,RR,10.8,15.2,5.0,8,22
+2026-10-26T18:33:56,Boot / Launch,SJF,5.6,10.0,5.6,4,22
+2026-10-26T18:38:22,Active Gameplay,FCFS,9.4,13.8,9.4,4,22
+2026-10-26T18:55:52,Active Gameplay,PRIORITY,9.4,13.8,9.4,4,22
+2026-10-26T20:04:26,Active Gameplay,PRIORITY,9.4,13.8,9.4,4,22
+2026-10-26T20:06:20,Boot / Launch,SJF,5.6,10.0,5.6,4,22
+2026-10-26T20:06:22,Loading Into Match,PRIORITY,9.4,13.8,9.4,4,22
+2026-10-26T20:06:23,Active Gameplay,PRIORITY,9.4,13.8,9.4,4,22
+2026-10-26T20:06:35,Active Gameplay,PRIORITY,9.4,13.8,9.4,4,22
+2026-10-26T20:06:40,Active Gameplay,PRIORITY,9.4,13.8,9.4,4,22
+2026-10-26T20:06:43,Active Gameplay,PRIORITY,9.4,13.8,9.4,4,22
+2026-10-26T20:06:51,Boot / Launch,SJF,5.6,10.0,5.6,4,22
+2026-10-26T20:06:52,Background / Menu,FCFS,9.4,13.8,9.4,4,22
+2026-10-26T20:06:56,Active Gameplay,PRIORITY,9.4,13.8,9.4,4,22

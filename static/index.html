@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adaptive CPU Scheduler</title>
+<style>
+:root{font-family:Inter,Segoe UI,Arial,sans-serif;color:#172033;background:#f3f6fb}
+*{box-sizing:border-box}body{margin:0}header{background:#111b32;color:white;padding:24px max(20px,calc((100% - 1180px)/2))}
+header h1{margin:0 0 7px;font-size:clamp(22px,3vw,32px)}header p{margin:0;color:#c5d0e6}
+main{max-width:1180px;margin:22px auto;padding:0 18px 40px}
+.notice{background:#fff7df;border:1px solid #efd78d;color:#624b00;padding:12px 15px;border-radius:12px;margin-bottom:18px;font-size:14px;line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.card{background:white;border:1px solid #e2e8f2;border-radius:14px;padding:17px;box-shadow:0 3px 12px #14213b08}
+.metric-label{color:#68748b;font-size:13px}.metric-value{font-size:28px;font-weight:750;margin:8px 0 3px}.muted{color:#738098;font-size:12px}
+.columns{display:grid;grid-template-columns: minmax(280px, .8fr) minmax(0,1.2fr);gap:16px}
+h2{font-size:18px;margin:0 0 15px}.field{margin-bottom:14px}label{display:block;font-size:13px;font-weight:650;margin-bottom:7px}
+select,button{font:inherit;border-radius:9px;padding:11px 12px}select{width:100%;border:1px solid #ccd5e4;background:white;color:#172033}
+button{border:0;background:#245be8;color:white;font-weight:700;cursor:pointer}button:hover{background:#1949c7}button.secondary{background:#eaf0ff;color:#234eb5}button:disabled{opacity:.6;cursor:wait}
+.row{display:flex;gap:9px;flex-wrap:wrap}.row button{flex:1}
+.policy-pill{display:inline-block;border-radius:999px;background:#e8f0ff;color:#234eb5;padding:6px 10px;font-size:12px;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #edf0f5}th{color:#69758b;font-weight:650}
+.barlist{display:flex;flex-direction:column;gap:10px}.barrow{display:grid;grid-template-columns:120px 1fr 45px;gap:9px;align-items:center;font-size:12px}.track{height:17px;border-radius:5px;background:#edf1f7;overflow:hidden}.bar{height:100%;border-radius:5px;background:#4c77f0}
+.timeline{display:flex;min-height:55px;overflow-x:auto;border:1px solid #e3e9f3;border-radius:8px;background:#f9fbff;margin-top:12px}
+.segment{display:flex;align-items:center;justify-content:center;min-width:38px;padding:5px;color:white;font-size:10px;font-weight:700;border-right:1px solid #ffffff88;white-space:nowrap}
+.small{font-size:12px;color:#718097;line-height:1.5}.status{font-size:12px;color:#68748b;margin-top:10px}
+@media(max-width:800px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.columns{grid-template-columns:1fr}}
+@media(max-width:430px){.grid{grid-template-columns:1fr 1fr}.metric-value{font-size:22px}.barrow{grid-template-columns:95px 1fr 35px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Adaptive Stage-Aware CPU Scheduler</h1>
+  <p>Operating Systems project · Step 1: laptop dashboard and scheduling simulation</p>
+</header>
+<main>
+  <div class="notice"><strong>Prototype note:</strong> CPU and memory cards show this Windows laptop's readings. The task schedule and its timing metrics are simulated examples. This dashboard does not control Windows' kernel scheduler or read Android game data yet.</div>
+  <section class="grid">
+    <div class="card"><div class="metric-label">Laptop CPU usage</div><div class="metric-value" id="cpu">--%</div><div class="muted">Whole-device estimate</div></div>
+    <div class="card"><div class="metric-label">Laptop memory usage</div><div class="metric-value" id="memory">--%</div><div class="muted">Physical memory in use</div></div>
+    <div class="card"><div class="metric-label">Selected game stage</div><div class="metric-value" id="stageMetric" style="font-size:19px">Active Gameplay</div><div class="muted">Selected manually in Step 1</div></div>
+    <div class="card"><div class="metric-label">Recommended policy</div><div class="metric-value" id="policyMetric" style="font-size:22px">Priority</div><div class="muted">Based on stage mapping</div></div>
+  </section>
+
+  <section class="columns">
+    <div class="card">
+      <h2>Stage and policy control</h2>
+      <div class="field"><label for="stage">Game stage</label>
+        <select id="stage">
+          <option>Boot / Launch</option><option>Matchmaking / Queue</option><option>Loading Into Match</option><option selected>Active Gameplay</option><option>Spectating</option><option>Background / Menu</option>
+        </select>
+      </div>
+      <div class="field"><label for="policy">Scheduling policy</label>
+        <select id="policy"><option value="AUTO">Auto policy for this stage</option><option value="FCFS">FCFS</option><option value="SJF">Shortest Job First (SJF)</option><option value="PRIORITY">Priority Scheduling</option><option value="RR">Round Robin (RR)</option></select>
+        <div class="small" id="policyHint" style="margin-top:7px">Auto policy chooses a default based on the stage.</div>
+      </div>
+      <div class="row"><button id="run">Run scheduling simulation</button><button class="secondary" id="reset">Clear results</button></div>
+      <div class="status" id="status">Ready. Run a simulation to see scheduling metrics.</div>
+      <hr style="border:0;border-top:1px solid #edf0f5;margin:18px 0">
+      <h2>Stage policy mapping</h2>
+      <table><thead><tr><th>Stage</th><th>Default policy</th></tr></thead><tbody id="mapping"></tbody></table>
+    </div>
+    <div class="card">
+      <h2>Simulation performance</h2>
+      <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:12px">
+        <div><div class="metric-label">Average waiting</div><div class="metric-value" id="waiting">--</div><div class="muted">simulated time units</div></div>
+        <div><div class="metric-label">Average turnaround</div><div class="metric-value" id="turnaround">--</div><div class="muted">simulated time units</div></div>
+        <div><div class="metric-label">Average response</div><div class="metric-value" id="response">--</div><div class="muted">simulated time units</div></div>
+        <div><div class="metric-label">Context switches</div><div class="metric-value" id="switches">--</div><div class="muted">simulated task changes</div></div>
+      </div>
+      <h2 style="margin-top:12px">Task timeline</h2><div class="timeline" id="timeline"><div class="small" style="padding:12px">Run a simulation to populate the timeline.</div></div>
+      <div class="small" style="margin-top:8px">Timeline widths represent simulated CPU time. Round Robin uses a time quantum of 3.</div>
+    </div>
+  </section>
+  <section class="card" style="margin-top:16px">
+    <h2>Task details</h2>
+    <div style="overflow-x:auto"><table><thead><tr><th>Task</th><th>Arrival</th><th>Burst</th><th>Priority</th><th>Completion</th><th>Waiting</th><th>Turnaround</th><th>Response</th></tr></thead><tbody id="tasks"><tr><td colspan="8" class="small">No simulation yet.</td></tr></tbody></table></div>
+    <div class="row" style="margin-top:15px;justify-content:flex-end"><button class="secondary" id="export">Export CSV</button></div>
+    <div class="small" style="margin-top:8px">Every run is also appended to <code>data/scheduling_log.csv</code> beside the Python server.</div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const colors = ["#3968d8","#16a085","#b36bda","#e39b26","#e45b69"];
+let historyRows = [];
+let stageMap = {};
+const policyLabels = {FCFS:"FCFS",SJF:"Shortest Job First",PRIORITY:"Priority",RR:"Round Robin"};
+async function getJSON(url){const r=await fetch(url);if(!r.ok)throw new Error("Request failed");return r.json();}
+async function updateMetrics(){
+  try{
+    const m=await getJSON("/api/metrics");
+    $("cpu").textContent=m.cpu_percent===null?"N/A":m.cpu_percent+"%";
+    $("memory").textContent=m.memory_percent===null?"N/A":m.memory_percent+"%";
+  }catch(e){$("cpu").textContent="Offline";$("memory").textContent="Offline";}
+}
+function updateStage(){
+  const stage=$("stage").value;
+  $("stageMetric").textContent=stage;
+  const recommended=stageMap[stage]||"PRIORITY";
+  const selected=$("policy").value;
+  $("policyMetric").textContent=selected==="AUTO"?(policyLabels[recommended]||recommended):policyLabels[selected];
+  $("policyHint").textContent=selected==="AUTO"?"Recommended for this stage: "+(policyLabels[recommended]||recommended)+".":"Manual override: "+(policyLabels[selected]||selected)+".";
+}
+function renderResult(r){
+  $("waiting").textContent=r.metrics.avg_waiting;
+  $("turnaround").textContent=r.metrics.avg_turnaround;
+  $("response").textContent=r.metrics.avg_response;
+  $("switches").textContent=r.metrics.context_switches;
+  $("tasks").innerHTML=r.tasks.map(t=>`<tr><td>${t.task}</td><td>${t.arrival}</td><td>${t.burst}</td><td>${t.priority}</td><td>${t.completion}</td><td>${t.waiting}</td><td>${t.turnaround}</td><td>${t.response}</td></tr>`).join("");
+  const max=Math.max(...r.timeline.map(t=>t.end),1);
+  $("timeline").innerHTML=r.timeline.map((t,i)=>`<div class="segment" title="${t.task}: ${t.start} to ${t.end}" style="width:${((t.end-t.start)/max)*100}%;background:${colors[["Input handling","Game loop","Asset loading","Network update","UI animation"].indexOf(t.task)]||"#6b7c99"}">${t.task}</div>`).join("");
+  $("status").textContent=`Completed ${r.policy_name} simulation for "${r.stage}" at ${r.timestamp}. Results are simulated.`;
+  historyRows.push({timestamp:r.timestamp,stage:r.stage,policy:r.policy,avg_waiting:r.metrics.avg_waiting,avg_turnaround:r.metrics.avg_turnaround,avg_response:r.metrics.avg_response,context_switches:r.metrics.context_switches,makespan:r.metrics.makespan});
+  updateStage();
+}
+async function loadConfig(){
+  const c=await getJSON("/api/config");stageMap=c.stages;
+  $("mapping").innerHTML=Object.entries(c.stages).map(([s,p])=>`<tr><td>${s}</td><td><span class="policy-pill">${p}</span></td></tr>`).join("");
+  updateStage();
+}
+$("stage").addEventListener("change",updateStage);
+$("policy").addEventListener("change",updateStage);
+$("run").addEventListener("click",async()=>{
+  $("run").disabled=true;$("status").textContent="Running simulation...";
+  try{
+    const r=await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stage:$("stage").value,policy:$("policy").value})});
+    const data=await r.json();if(!r.ok)throw new Error(data.error||"Simulation failed");renderResult(data);
+  }catch(e){$("status").textContent="Error: "+e.message;}
+  finally{$("run").disabled=false;}
+});
+$("reset").addEventListener("click",()=>{
+  ["waiting","turnaround","response","switches"].forEach(id=>$(id).textContent="--");
+  $("tasks").innerHTML='<tr><td colspan="8" class="small">No simulation yet.</td></tr>';
+  $("timeline").innerHTML='<div class="small" style="padding:12px">Run a simulation to populate the timeline.</div>';
+  $("status").textContent="Results cleared. Previous runs remain in the CSV log.";
+});
+$("export").addEventListener("click",()=>{
+  if(!historyRows.length){$("status").textContent="Run at least one simulation before exporting browser history.";return;}
+  const keys=Object.keys(historyRows[0]);
+  const csv=[keys.join(","),...historyRows.map(row=>keys.map(k=>JSON.stringify(row[k]??"")).join(","))].join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="scheduling_history.csv";a.click();URL.revokeObjectURL(a.href);
+});
+loadConfig().catch(e=>$("status").textContent="Could not load configuration: "+e.message);
+updateMetrics();setInterval(updateMetrics,2000);
+</script>
+</body></html>
